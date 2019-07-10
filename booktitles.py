@@ -1,3 +1,4 @@
+import sys
 import requests
 from tqdm import tqdm
 from xml.etree import ElementTree
@@ -12,10 +13,10 @@ import numpy as np
 import logging
 logging.basicConfig(level=logging.INFO)
 
-GRPopularURL = "https://www.goodreads.com/book/popular_by_date/2019/6?id=2019/June"
+GRPopularURL = "https://www.goodreads.com/book/popular_by_date/2019/5?id=2019/May"
 GBpath = """https://www.googleapis.com/books/v1/volumes?q="{}"""""
 popular_path = ".//Database//goodreads_popular.csv"
-master_book_path = ".//Database//books.csv"
+book_titles_path = ".//Database//books_titles.csv"
 
 class Books():
 
@@ -23,25 +24,42 @@ class Books():
         keys = get_config_from_json('.//Keys//keys.json')
         self.gr_key = keys['goodreads_key']['api_key']
 
+    def main(self,maxtitles=200):
+        self.maxtitles = maxtitles
+        try:
+            self.book_titles = pd.read_csv(book_titles_path,index_col=0)
+            logging.info("Found existing book_titles. Appending to it")
+            self.updateDB()
+        except IOError as e:
+            logging.info("No existing book_titles found")
+            self.createNewDB()
+        except Exception as ex:
+            print(ex)
+            sys.exit(1)
+
+        self.writeToDB()
+
+
     def getGRpopular(self):
+        logging.info("Getting latest copy of popular titles from Goodreads...")
+
         r = requests.get(GRPopularURL)
-
         soup = BeautifulSoup(r.content,'html5lib')
-
         titles = soup.findAll("a", attrs={'class':'bookTitle'})
         title_list = []
-        for title in tqdm(titles):
-            # t = re.sub("[\(\[].*?[\)\]]", "", title.text)
-            t = title.text.strip('\n').lstrip().rstrip()
-            title_list.append(t)
 
-        logging.info("Received data on popular books from Goodreads")
+        for count, title in tqdm(enumerate(titles)):
+            if count == self.maxtitles:
+                break
+            else:
+                t = title.text.strip('\n').lstrip().rstrip()
+                title_list.append(t)
+        logging.info("Received data on popular books from Goodreads for {} titles".format(len(title_list)))
 
         goodreads_popular = pd.DataFrame(title_list, columns=['title'])
         goodreads_popular.index.name = "popId"
         goodreads_popular.to_csv(popular_path)
-
-        return title_list
+        return goodreads_popular
 
     def getGRmeta(self, title):
         show_URL = "https://www.goodreads.com/book/title.xml?key={}&title={}".format(self.gr_key,title)
@@ -174,11 +192,12 @@ class Books():
     def createNewDB(self):
         logging.info("Creating new books database")
 
-        popdf = pd.read_csv(popular_path)
+        popdf = self.getGRpopular()
+        # popdf = pd.read_csv(popular_path)
         pop_titles = popdf['title'].values
         master_books = pd.DataFrame()
 
-        counter = 0
+        counter=0
         for title in tqdm(pop_titles):
             gr_meta = self.getGRmeta(title)
             master_books = master_books.append(gr_meta, ignore_index=True)
@@ -186,66 +205,31 @@ class Books():
             time.sleep(2)
 
         logging.info("Created new books data with {} titles".format(counter))
-        self.writeToDB(master_books,master_book_path)
-        return master_books
+        self.book_titles = master_books
 
-    def writeToDB(self, df, path):
-        df.to_csv(path)
-        logging.info("Database updated")
 
     def updateDB(self):
 
-        try:
-            books = pd.read_csv(".//Database//books.csv")
-            logging.info("Found books database. Appending to current database")
+        popdf = self.getGRpopular()
+        # popdf = pd.read_csv(popular_path)
+        curr_titles = self.book_titles['title'].values
+        unique_titles = [title for title in popdf['title'].values if title not in curr_titles]
 
-            # pop_titles = getGRPopular()
-            pop_titles = self.getGRpopular()
-            curr_titles = books['title'].values
+        logging.info("Getting metadata for {} new titles".format(len(unique_titles)))
 
-            counter = 0
-            for title in pop_titles:
-                if title in curr_titles:
-                    logging.info("{} is ignored as it is a duplicate".format(title))
-                else:
-                    counter += 1
-                    if counter % 4 == 0:
-                        logging.info("Resetting...")
-                        time.sleep(5)
-                    else:
-                        title_name, author, publisher, publishedDate, description, isbn_13, isbn_10, categories, gb_rating, gb_ratingcount = \
-                            self.getGB_metadata(title)
-                        new_row = pd.DataFrame(
-                            [(title_name, author, publisher, publishedDate, description, isbn_13, isbn_10, categories,
-                              gb_rating, gb_ratingcount)],
-                            columns=['title', 'author', 'publisher', 'publishedDate', 'description', 'isbn_13',
-                                     'isbn_10', 'categories', 'gb_rating', 'gb_ratingcount'])
-                        books = pd.concat([books, new_row], axis=0, sort=False, ignore_index=True)
-                        logging.info("{} added to books database".format(title))
+        counter=0
+        for title in tqdm(unique_titles):
+            gr_meta = self.getGRmeta(title)
+            self.book_titles = self.book_titles.append(gr_meta, ignore_index=True)
+            counter += 1
+            time.sleep(2)
 
+        logging.info("{} new titles added to database".format(counter))
 
-
-            books.set_index(['id'],inplace=True)
-            books.reset_index(inplace=True, drop=True)
-            books.to_csv(".//Database//books.csv")
-
-        except Exception as ex:
-            print(ex)
-            logging.info("No existing database found. Creating new...")
-            pop_titles = "Moonwalking with Einstein"
-            title_name, author, publisher, publishedDate, description, isbn_13, isbn_10, categories, gb_rating, gb_ratingcount = \
-                self.getGB_metadata(pop_titles)
-            books = pd.DataFrame([(title_name,author,publisher, publishedDate,description, isbn_13,isbn_10,categories,gb_rating,gb_ratingcount)],
-                         columns=['title','author','publisher', 'publishedDate','description', 'isbn_13','isbn_10','categories','gb_rating','gb_ratingcount'])
-            books.index.name = "id"
-            books.to_csv(".//Database//books.csv")
+    def writeToDB(self):
+        self.book_titles.to_csv(book_titles_path)
 
 if __name__ == '__main__':
 
     books = Books()
-    # books.getGRpopular()
-    # print(books.getGRmeta("Julie of the Wolves (Julie of the Wolves, #1)"))
-    books.createNewDB()
-    # print(books.getGRtitle("Julie of the Wolves (Julie of the Wolves, #1)"))
-    # print(books.getGB_metadata())
-    # books.updateDB()
+    books.main(maxtitles = 8)

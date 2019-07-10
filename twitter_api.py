@@ -5,12 +5,15 @@ import json
 import re
 import spacy
 from config import get_config_from_json
+import logging
+logging.basicConfig(level=logging.INFO)
 
 
 class GetTwitter():
 
     def __init__(self):
         self.nlp = spacy.load('en_core_web_lg')
+        logging.info("Spacy is loaded")
         self.contraction_mapping = {"ain't": "is not", "aren't": "are not", "can't": "cannot",
                                "can't've": "cannot have", "'cause": "because", "could've": "could have",
                                "couldn't": "could not", "couldn't've": "could not have", "didn't": "did not",
@@ -60,7 +63,6 @@ class GetTwitter():
         try:
             self.api = tw.API(self.auth, wait_on_rate_limit=True)
             limit = self.api.rate_limit_status()
-            print(limit)
         except Exception as ex:
             print(ex)
 
@@ -140,8 +142,11 @@ class GetTwitter():
 
 if __name__ == '__main__':
     twitter = GetTwitter()
-    tweet_id, tweet_text, tweet_location, tweet_time = twitter.getTweetsbyQuery("can't", max_tweets=1, date_since="06/01/19")
+    # query = '"The Bride Test" AND (read OR book) -filter:retweets -filter:links -filter:replies'
+    query = "Witness for the Prosecution"
+    tweet_id, tweet_text, tweet_location, tweet_time = twitter.getTweetsbyQuery(query, max_tweets=100, date_since="2019-06-01")
     print(tweet_id, tweet_text, tweet_location, tweet_time)
+    print(twitter.spacy_clean(tweet_text))
 
 
 
