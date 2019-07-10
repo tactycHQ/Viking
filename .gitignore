@@ -137,3 +137,7 @@ twitter_api.py
 /Database/goodreads_new_release_data/
 /Database/goodreads_popular.csv
 /Keys/
+!/books.py
+!/config.py
+!/justread.py
+!/twitter_api.py
