@@ -141,3 +141,4 @@ twitter_api.py
 !/config.py
 !/justread.py
 !/twitter_api.py
+!/.gitignore
