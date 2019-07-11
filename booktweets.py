@@ -10,12 +10,15 @@ logging.basicConfig(level=logging.INFO)
 
 book_titles_path = ".//Database//books_titles.csv"
 book_tweets_path = ".//Database//books_tweets.csv"
+queries_path = ".//Database//queries.csv"
 
 class BookTweets():
 
+    def __init__(self):
+        pass
+
     def main(self):
         self.loadTitles()
-        self.getUniqueTitles()
         self.createQueries()
         self.getTweets()
 
@@ -23,23 +26,25 @@ class BookTweets():
         self.book_titles = pd.read_csv(book_titles_path, index_col=0)
         return self.book_titles
 
-    def getUniqueTitles(self):
-        titles = np.unique(self.book_titles.title)
-        return titles
-
     def createQueries(self):
-        titles = self.getUniqueTitles()
+        df = self.book_titles
+        titles = df['title'].values
+        authors = df['author'].values
         filter = "-filter:retweets -filter:links -filter:replies"
         content = "AND (read OR reads OR reading OR book OR books OR novel OR author)"
 
         queries = []
-        for title in titles:
+        for title, author in zip(titles, authors):
             title = re.sub("[\(\[].*?[\)\]]", "", title)
             title = title.rstrip()
-            query = '"{}" OR "{}" {} {}'.format(title,title.lower(),content,filter)
+            title = title.split(":")[0]
+            # author_names = author.split()
+            # author_lname = author_names[-1]
+            query = '"{}" OR "{}" AND {} {} {}'.format(title,title.lower(),author,content,filter)
             queries.append(query)
 
         queries_df = pd.DataFrame({'title':titles,'queryString':queries})
+        queries_df.to_csv(queries_path)
         return queries_df
 
     def getTweets(self, batch_size=200):
