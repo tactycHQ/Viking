@@ -13,7 +13,7 @@ import numpy as np
 import logging
 logging.basicConfig(level=logging.INFO)
 
-GRPopularURL = "https://www.goodreads.com/book/popular_by_date/2019/5?id=2019/May"
+GRPopularURL = "https://www.goodreads.com/book/popular_by_date/2019/7?id=2019/July"
 GBpath = """https://www.googleapis.com/books/v1/volumes?q="{}"""""
 popular_path = ".//Database//goodreads_popular.csv"
 book_titles_path = ".//Database//books_titles.csv"
@@ -39,30 +39,31 @@ class Books():
 
         self.writeToDB()
 
-
     def getGRpopular(self):
         logging.info("Getting latest copy of popular titles from Goodreads...")
 
         r = requests.get(GRPopularURL)
         soup = BeautifulSoup(r.content,'html5lib')
-        titles = soup.findAll("a", attrs={'class':'bookTitle'})
-        title_list = []
+        input_tags = soup.findAll("input",{"id":"book_id"})
 
-        for count, title in tqdm(enumerate(titles)):
+        ids = []
+        count = 0
+        for tag in input_tags:
             if count == self.maxtitles:
                 break
             else:
-                t = title.text.strip('\n').lstrip().rstrip()
-                title_list.append(t)
-        logging.info("Received data on popular books from Goodreads for {} titles".format(len(title_list)))
+                if tag["value"] is not None and tag["value"] not in ids:
+                    ids.append(tag["value"])
+                    count += 1
 
-        goodreads_popular = pd.DataFrame(title_list, columns=['title'])
-        goodreads_popular.index.name = "popId"
+        logging.info("Received data on popular books from Goodreads for {} titles".format(len(ids)))
+        goodreads_popular = pd.DataFrame(ids, columns=['gr_id'])
+        goodreads_popular.index.name = "id"
         goodreads_popular.to_csv(popular_path)
         return goodreads_popular
 
-    def getGRmeta(self, title):
-        show_URL = "https://www.goodreads.com/book/title.xml?key={}&title={}".format(self.gr_key,title)
+    def getGRmeta(self, id):
+        show_URL = "https://www.goodreads.com/book/show/{}.xml?key={}".format(id,self.gr_key)
 
         r = requests.get(show_URL)
         resp = r.content
@@ -70,7 +71,12 @@ class Books():
         root = tree.getroot()
 
         gr_meta ={}
-        gr_meta["title"] = title
+
+        gr_meta["gr_id"] = id
+
+        for child in root.iter('title'):
+            gr_meta["title"] = child.text
+            break
 
         for child in root.iter('isbn'):
             gr_meta["isbn"] = child.text
@@ -194,12 +200,12 @@ class Books():
 
         popdf = self.getGRpopular()
         # popdf = pd.read_csv(popular_path)
-        pop_titles = popdf['title'].values
+        pop_id = popdf['gr_id'].values
         master_books = pd.DataFrame()
 
         counter=0
-        for title in tqdm(pop_titles):
-            gr_meta = self.getGRmeta(title)
+        for id in tqdm(pop_id):
+            gr_meta = self.getGRmeta(id)
             master_books = master_books.append(gr_meta, ignore_index=True)
             counter+=1
             time.sleep(2)
@@ -212,14 +218,14 @@ class Books():
 
         popdf = self.getGRpopular()
         # popdf = pd.read_csv(popular_path)
-        curr_titles = self.book_titles['title'].values
-        unique_titles = [title for title in popdf['title'].values if title not in curr_titles]
+        curr_id = self.book_titles['gr_id'].astype(int).tolist()
+        unique_ids = [id for id in popdf['gr_id'].astype(int).tolist() if id not in curr_id]
 
-        logging.info("Getting metadata for {} new titles".format(len(unique_titles)))
+        logging.info("Getting metadata for {} new titles".format(len(unique_ids)))
 
         counter=0
-        for title in tqdm(unique_titles):
-            gr_meta = self.getGRmeta(title)
+        for id in tqdm(unique_ids):
+            gr_meta = self.getGRmeta(id)
             self.book_titles = self.book_titles.append(gr_meta, ignore_index=True)
             counter += 1
             time.sleep(2)
@@ -232,4 +238,5 @@ class Books():
 if __name__ == '__main__':
 
     books = Books()
-    books.main(maxtitles = 8)
+    # books.getGRpopular()
+    books.main(maxtitles = 200)

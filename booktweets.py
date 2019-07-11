@@ -42,12 +42,12 @@ class BookTweets():
         queries_df = pd.DataFrame({'title':titles,'queryString':queries})
         return queries_df
 
-    def getTweets(self, batch_size=100):
+    def getTweets(self, batch_size=200):
 
         queries_df = self.createQueries()
         tw = GetTwitter()
 
-        max_tweets = 200
+        max_tweets = 100
         date_since = '2019-06-01'
         rawTweets, tweetId, spacyTweets, vaderTweets, tweetTime, tweetLocation, titleTracker = \
         [],[],[],[],[],[],[]
@@ -126,7 +126,7 @@ class BookTweets():
         counts_df7 = latest_df7['title'].value_counts().rename_axis('title').reset_index(name='7day')
 
         books_df = books_df.merge(counts_df7,how='left',on='title')
-
+        self.book_titles = books_df
         logging.info("Query counts successfully added")
 
     def getEarliestTimeStamp(self):
