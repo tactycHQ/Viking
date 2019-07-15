@@ -60,8 +60,6 @@ class GetTwitter():
                                "you'll've": "you will have", "you're": "you are", "you've": "you have"}
         self.keys = get_config_from_json('.//Keys//keys.json')
         self.auth = tw.AppAuthHandler(self.keys['twitter_keys']['consumer_key'],self.keys['twitter_keys']['consumer_secret'])
-        print(self.auth._bearer_token)
-
         try:
             self.api = tw.API(self.auth, wait_on_rate_limit=True)
             limit = self.api.rate_limit_status()

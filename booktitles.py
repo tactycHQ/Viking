@@ -13,7 +13,7 @@ import numpy as np
 import logging
 logging.basicConfig(level=logging.INFO)
 
-GRPopularURL = "https://www.goodreads.com/book/popular_by_date/2019/6?id=2019/June"
+GRPopularURL = "https://www.goodreads.com/book/popular_by_date/2019/5?id=2019/May"
 GBpath = """https://www.googleapis.com/books/v1/volumes?q="{}"""""
 popular_path = ".//Database//goodreads_popular.csv"
 book_titles_path = ".//Database//books_titles.csv"
