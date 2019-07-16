@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.INFO)
 GRPopularURL = "https://www.goodreads.com/book/popular_by_date/2019/5?id=2019/May"
 GBpath = """https://www.googleapis.com/books/v1/volumes?q="{}"""""
 popular_path = ".//Database//goodreads_popular.csv"
+releases_path = ".//Database//combined.csv"
 book_titles_path = ".//Database//books_titles.csv"
 
 class Books():
@@ -64,10 +65,12 @@ class Books():
 
     def getGRmeta(self, id):
         show_URL = "https://www.goodreads.com/book/show/{}.xml?key={}".format(id,self.gr_key)
+        # show_URL = "https://www.goodreads.com/book/show/{}.xml".format(id)
 
         r = requests.get(show_URL)
         resp = r.content
         tree = ElementTree.ElementTree(ElementTree.fromstring(resp))
+        # tree = ElementTree.ElementTree(ElementTree.fromstring(resp,ElementTree.XMLParser(encoding='utf-8')))
         root = tree.getroot()
 
         gr_meta ={}
@@ -198,8 +201,8 @@ class Books():
     def createNewDB(self):
         logging.info("Creating new books database")
 
-        popdf = self.getGRpopular()
-        # popdf = pd.read_csv(popular_path)
+        # popdf = self.getGRpopular()
+        popdf = pd.read_csv(releases_path)
         pop_id = popdf['gr_id'].values
         master_books = pd.DataFrame()
 
@@ -208,7 +211,9 @@ class Books():
             gr_meta = self.getGRmeta(id)
             master_books = master_books.append(gr_meta, ignore_index=True)
             counter+=1
-            time.sleep(2)
+            time.sleep(1.5)
+            if counter % 50 == 0:
+                master_books.to_csv(book_titles_path)
 
         logging.info("Created new books data with {} titles".format(counter))
         self.book_titles = master_books
@@ -217,7 +222,7 @@ class Books():
     def updateDB(self):
 
         popdf = self.getGRpopular()
-        # popdf = pd.read_csv(popular_path)
+        # popdf = pd.read_csv(releases_path)
         curr_id = self.book_titles['gr_id'].astype(int).tolist()
         unique_ids = [id for id in popdf['gr_id'].astype(int).tolist() if id not in curr_id]
 
@@ -228,7 +233,7 @@ class Books():
             gr_meta = self.getGRmeta(id)
             self.book_titles = self.book_titles.append(gr_meta, ignore_index=True)
             counter += 1
-            time.sleep(2)
+            time.sleep(1.5)
 
         logging.info("{} new titles added to database".format(counter))
 
@@ -239,4 +244,6 @@ if __name__ == '__main__':
 
     books = Books()
     # books.getGRpopular()
-    books.main(maxtitles = 200)
+    # books.main(maxtitles = 200)
+    books.createNewDB()
+    books.writeToDB()

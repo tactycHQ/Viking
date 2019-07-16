@@ -131,7 +131,7 @@ Keys/
 booktitles.py
 config.py
 googlebooks.py
-justread.py
+utils/justread.py
 twitter_api.py
 /Keys/keys.json
 /Database/goodreads_new_release_data/
@@ -139,7 +139,7 @@ twitter_api.py
 /Keys/
 !/booktitles.py
 !/config.py
-!/justread.py
+!/utils/justread.py
 !/twitter_api.py
 !/.gitignore
 !/requirements.txt
